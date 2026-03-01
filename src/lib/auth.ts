@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
+import { getSupabase } from "@/lib/supabase";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -45,6 +46,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return Response.redirect(new URL("/", nextUrl));
       }
       return true;
+    },
+  },
+  events: {
+    async signIn({ user, account }) {
+      // Reset demo user data on every demo sign-in for a fresh experience
+      if (account?.provider === "demo" && user.id) {
+        try {
+          // ON DELETE CASCADE removes cart_items and notifications too
+          await getSupabase().from("user_profiles").delete().eq("id", user.id);
+        } catch (e) {
+          console.error("Failed to reset demo user:", e);
+        }
+      }
     },
   },
   session: {

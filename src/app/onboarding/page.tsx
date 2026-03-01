@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useUserStore } from "@/stores/user-store";
 import { completeOnboarding } from "@/actions/user-actions";
 import Logo from "@/components/Logo";
 import Button from "@/components/ui/Button";
@@ -14,9 +12,7 @@ const DRAFT_KEY = "crimson-luna-onboarding-draft";
 const STEP_KEY = "crimson-luna-onboarding-step";
 
 export default function OnboardingPage() {
-  const router = useRouter();
   const { data: session } = useSession();
-  const { setProfile } = useUserStore();
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState({
     age: "",
@@ -118,21 +114,10 @@ export default function OnboardingPage() {
         periodDuration: parseInt(formData.periodDuration),
         lastPeriodDate: formData.lastPeriodDate,
       });
-      // Update client store so navigation is instant
-      setProfile({
-        id: userId,
-        name: session?.user?.name || "User",
-        email: session?.user?.email || "",
-        image: session?.user?.image || undefined,
-        age: parseInt(formData.age),
-        cycleLength: parseInt(formData.cycleLength),
-        periodDuration: parseInt(formData.periodDuration),
-        lastPeriodDate: formData.lastPeriodDate,
-        onboardingComplete: true,
-      });
       localStorage.removeItem(DRAFT_KEY);
       localStorage.removeItem(STEP_KEY);
-      router.push("/dashboard");
+      // Hard navigate to bypass Next.js Router Cache
+      window.location.href = "/dashboard";
     }
   }
 
