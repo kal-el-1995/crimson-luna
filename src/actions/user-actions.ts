@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabase } from "@/lib/supabase";
+import { auth } from "@/lib/auth";
 import { UserProfile } from "@/types";
 
 interface DBUserProfile {
@@ -90,4 +91,13 @@ export async function updateUserProfile(
   if (data.onboardingComplete !== undefined) updates.onboarding_complete = data.onboardingComplete;
 
   await getSupabase().from("user_profiles").update(updates).eq("id", userId);
+}
+
+const DEMO_USER_ID = "demo-user-1";
+
+export async function cleanupDemoUser(): Promise<void> {
+  const session = await auth();
+  if (session?.user?.id !== DEMO_USER_ID) return;
+  // ON DELETE CASCADE removes cart_items and notifications too
+  await getSupabase().from("user_profiles").delete().eq("id", DEMO_USER_ID);
 }
