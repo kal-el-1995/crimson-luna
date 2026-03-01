@@ -52,7 +52,7 @@ export async function createUserProfile(
   userId: string,
   email: string
 ): Promise<void> {
-  await getSupabase().from("user_profiles").upsert(
+  const { error } = await getSupabase().from("user_profiles").upsert(
     {
       id: userId,
       email: email ?? "",
@@ -62,6 +62,19 @@ export async function createUserProfile(
     },
     { onConflict: "id", ignoreDuplicates: true }
   );
+
+  // If email unique constraint blocks the insert, delete the stale row
+  // (orphaned from a previous session with a different user ID) and retry
+  if (error?.code === "23505") {
+    await getSupabase().from("user_profiles").delete().eq("email", email);
+    await getSupabase().from("user_profiles").insert({
+      id: userId,
+      email: email ?? "",
+      cycle_length: 28,
+      period_duration: 5,
+      onboarding_complete: false,
+    });
+  }
 }
 
 export async function completeOnboarding(
@@ -74,20 +87,42 @@ export async function completeOnboarding(
     lastPeriodDate: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
-  const { error } = await getSupabase().from("user_profiles").upsert({
-    id: userId,
-    email: data.email,
-    age: data.age,
-    cycle_length: data.cycleLength,
-    period_duration: data.periodDuration,
-    last_period_date: data.lastPeriodDate,
-    onboarding_complete: true,
-    updated_at: new Date().toISOString(),
-  });
+  // Use UPDATE (not upsert) to avoid email unique constraint conflicts
+  const { data: updated, error: updateError } = await getSupabase()
+    .from("user_profiles")
+    .update({
+      email: data.email,
+      age: data.age,
+      cycle_length: data.cycleLength,
+      period_duration: data.periodDuration,
+      last_period_date: data.lastPeriodDate,
+      onboarding_complete: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+    .select();
 
-  if (error) {
-    console.error("completeOnboarding failed:", error);
-    return { success: false, error: error.message };
+  if (!updateError && updated && updated.length > 0) {
+    revalidatePath("/dashboard");
+    return { success: true };
+  }
+
+  // Profile doesn't exist yet — insert it
+  const { error: insertError } = await getSupabase()
+    .from("user_profiles")
+    .insert({
+      id: userId,
+      email: data.email,
+      age: data.age,
+      cycle_length: data.cycleLength,
+      period_duration: data.periodDuration,
+      last_period_date: data.lastPeriodDate,
+      onboarding_complete: true,
+    });
+
+  if (insertError) {
+    console.error("completeOnboarding failed:", insertError);
+    return { success: false, error: insertError.message };
   }
 
   revalidatePath("/dashboard");
