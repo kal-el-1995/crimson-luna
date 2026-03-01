@@ -1,7 +1,6 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
-import { getSupabase } from "@/lib/supabase";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -53,6 +52,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // Reset demo user data on every demo sign-in for a fresh experience
       if (account?.provider === "demo" && user.id) {
         try {
+          // Dynamic import to avoid loading Supabase in Edge Runtime (middleware)
+          const { getSupabase } = await import("@/lib/supabase");
           // ON DELETE CASCADE removes cart_items and notifications too
           await getSupabase().from("user_profiles").delete().eq("id", user.id);
         } catch (e) {
