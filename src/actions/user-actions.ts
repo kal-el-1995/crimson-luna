@@ -158,3 +158,13 @@ export async function updateUserProfile(
 
   await getSupabase().from("user_profiles").update(updates).eq("id", userId);
 }
+
+const DEMO_USER_ID = "demo-user-1";
+
+export async function cleanupDemoUser(): Promise<void> {
+  const { auth } = await import("@/lib/auth");
+  const session = await auth();
+  if (session?.user?.id !== DEMO_USER_ID) return;
+  // ON DELETE CASCADE removes cart_items and notifications too
+  await getSupabase().from("user_profiles").delete().eq("id", DEMO_USER_ID);
+}
