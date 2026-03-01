@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabase } from "@/lib/supabase";
-import { auth } from "@/lib/auth";
 import { UserProfile } from "@/types";
 
 interface DBUserProfile {
@@ -27,54 +26,71 @@ function toUserProfile(row: DBUserProfile): Omit<UserProfile, "name" | "image"> 
   };
 }
 
-export async function getUserProfile(
-  userId: string
-): Promise<Omit<UserProfile, "name" | "image"> | null> {
-  const { data, error } = await getSupabase()
+/**
+ * Find a user profile — first by ID, then by email as fallback.
+ * If found by email with a stale ID, migrates the row to the current ID.
+ * If not found at all, creates a new blank profile.
+ * This single function replaces the old getUserProfile + createUserProfile flow.
+ */
+export async function ensureUserProfile(
+  userId: string,
+  email: string
+): Promise<Omit<UserProfile, "name" | "image">> {
+  const sb = getSupabase();
+
+  // 1. Try by ID (fast path — covers most logins)
+  const { data: byId, error: idError } = await sb
     .from("user_profiles")
     .select("*")
     .eq("id", userId)
     .single();
 
-  if (error) {
-    // PGRST116 = "JSON object requested, multiple (or no) rows returned"
-    // This means the user simply doesn't exist yet — return null
-    if (error.code === "PGRST116") return null;
-    // Any other error is a real DB issue — throw so the caller doesn't
-    // mistakenly try to create a duplicate profile
-    throw new Error(`getUserProfile failed: ${error.message}`);
+  if (!idError && byId) {
+    return toUserProfile(byId as DBUserProfile);
   }
 
-  return data ? toUserProfile(data as DBUserProfile) : null;
-}
+  // 2. Try by email — finds returning users whose session ID changed
+  if (email) {
+    const { data: byEmail } = await sb
+      .from("user_profiles")
+      .select("*")
+      .eq("email", email)
+      .single();
 
-export async function createUserProfile(
-  userId: string,
-  email: string
-): Promise<void> {
-  const { error } = await getSupabase().from("user_profiles").upsert(
-    {
-      id: userId,
-      email: email ?? "",
-      cycle_length: 28,
-      period_duration: 5,
-      onboarding_complete: false,
-    },
-    { onConflict: "id", ignoreDuplicates: true }
-  );
-
-  // If email unique constraint blocks the insert, delete the stale row
-  // (orphaned from a previous session with a different user ID) and retry
-  if (error?.code === "23505") {
-    await getSupabase().from("user_profiles").delete().eq("email", email);
-    await getSupabase().from("user_profiles").insert({
-      id: userId,
-      email: email ?? "",
-      cycle_length: 28,
-      period_duration: 5,
-      onboarding_complete: false,
-    });
+    if (byEmail) {
+      const old = byEmail as DBUserProfile;
+      // Migrate: delete old row, re-insert with current user ID + all existing data
+      await sb.from("user_profiles").delete().eq("id", old.id);
+      await sb.from("user_profiles").insert({
+        id: userId,
+        email: old.email,
+        age: old.age,
+        cycle_length: old.cycle_length,
+        period_duration: old.period_duration,
+        last_period_date: old.last_period_date,
+        onboarding_complete: old.onboarding_complete,
+      });
+      return toUserProfile({ ...old, id: userId });
+    }
   }
+
+  // 3. Truly new user — create a blank profile
+  await sb.from("user_profiles").insert({
+    id: userId,
+    email: email ?? "",
+    cycle_length: 28,
+    period_duration: 5,
+    onboarding_complete: false,
+  });
+
+  return {
+    id: userId,
+    email: email ?? "",
+    cycleLength: 28,
+    periodDuration: 5,
+    lastPeriodDate: "",
+    onboardingComplete: false,
+  };
 }
 
 export async function completeOnboarding(
@@ -87,8 +103,10 @@ export async function completeOnboarding(
     lastPeriodDate: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
-  // Use UPDATE (not upsert) to avoid email unique constraint conflicts
-  const { data: updated, error: updateError } = await getSupabase()
+  const sb = getSupabase();
+
+  // UPDATE by ID (profile should already exist from ensureUserProfile)
+  const { data: updated, error: updateError } = await sb
     .from("user_profiles")
     .update({
       email: data.email,
@@ -107,18 +125,16 @@ export async function completeOnboarding(
     return { success: true };
   }
 
-  // Profile doesn't exist yet — insert it
-  const { error: insertError } = await getSupabase()
-    .from("user_profiles")
-    .insert({
-      id: userId,
-      email: data.email,
-      age: data.age,
-      cycle_length: data.cycleLength,
-      period_duration: data.periodDuration,
-      last_period_date: data.lastPeriodDate,
-      onboarding_complete: true,
-    });
+  // Fallback: profile somehow missing — insert directly
+  const { error: insertError } = await sb.from("user_profiles").insert({
+    id: userId,
+    email: data.email,
+    age: data.age,
+    cycle_length: data.cycleLength,
+    period_duration: data.periodDuration,
+    last_period_date: data.lastPeriodDate,
+    onboarding_complete: true,
+  });
 
   if (insertError) {
     console.error("completeOnboarding failed:", insertError);
@@ -141,13 +157,4 @@ export async function updateUserProfile(
   if (data.onboardingComplete !== undefined) updates.onboarding_complete = data.onboardingComplete;
 
   await getSupabase().from("user_profiles").update(updates).eq("id", userId);
-}
-
-const DEMO_USER_ID = "demo-user-1";
-
-export async function cleanupDemoUser(): Promise<void> {
-  const session = await auth();
-  if (session?.user?.id !== DEMO_USER_ID) return;
-  // ON DELETE CASCADE removes cart_items and notifications too
-  await getSupabase().from("user_profiles").delete().eq("id", DEMO_USER_ID);
 }

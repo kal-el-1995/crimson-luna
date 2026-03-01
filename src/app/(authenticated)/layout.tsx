@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getUserProfile, createUserProfile } from "@/actions/user-actions";
+import { ensureUserProfile } from "@/actions/user-actions";
 import { getCartItems } from "@/actions/cart-actions";
 import { getOrSeedNotifications } from "@/actions/notification-actions";
 import { UserProfile } from "@/types";
@@ -19,31 +19,20 @@ export default async function AuthenticatedLayout({
 
   const userId = session.user.id;
 
-  let profile: Omit<UserProfile, "name" | "image"> | null = null;
-  let dbError = false;
+  // Single call: finds by ID, falls back to email, creates if truly new
+  let profile: Omit<UserProfile, "name" | "image">;
   try {
-    profile = await getUserProfile(userId);
-    if (!profile) {
-      // User truly doesn't exist yet — create a new profile
-      await createUserProfile(userId, session.user.email ?? "");
-      profile = await getUserProfile(userId);
-    }
+    profile = await ensureUserProfile(userId, session.user.email ?? "");
   } catch (e) {
-    // Real DB error (not "user not found") — don't try to create
     console.error("Supabase error:", e);
-    dbError = true;
-  }
-
-  if (!profile) {
+    // DB unreachable — let user through to dashboard rather than looping onboarding
     profile = {
       id: userId,
       email: session.user.email ?? "",
       cycleLength: 28,
       periodDuration: 5,
       lastPeriodDate: "",
-      // If DB errored, assume returning user — don't force onboarding
-      // If genuinely new (no DB error), they need onboarding
-      onboardingComplete: dbError,
+      onboardingComplete: true,
     };
   }
 
