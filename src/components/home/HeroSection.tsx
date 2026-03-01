@@ -2,7 +2,6 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { cleanupDemoUser } from "@/actions/user-actions";
 import Logo from "@/components/Logo";
 import SignInButton from "@/components/auth/SignInButton";
 import Button from "@/components/ui/Button";
@@ -76,10 +75,7 @@ export default function HeroSection() {
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
               <button
-                onClick={async () => {
-                  await cleanupDemoUser();
-                  signOut({ callbackUrl: "/" });
-                }}
+                onClick={() => signOut({ callbackUrl: "/" })}
                 className="inline-flex items-center gap-1.5 text-sm text-warm-white-muted hover:text-warm-white transition-colors"
               >
                 <LogOut className="w-3.5 h-3.5" />
