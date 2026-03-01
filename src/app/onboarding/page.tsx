@@ -21,6 +21,7 @@ export default function OnboardingPage() {
     lastPeriodDate: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
 
   // Rehydrate from localStorage on mount
   useEffect(() => {
@@ -105,19 +106,33 @@ export default function OnboardingPage() {
       setStep(nextStep);
       localStorage.setItem(STEP_KEY, String(nextStep));
     } else {
-      const userId = session?.user?.id || "user-1";
-      // Upsert the full profile (creates row if it doesn't exist)
-      await completeOnboarding(userId, {
-        email: session?.user?.email || "",
-        age: parseInt(formData.age),
-        cycleLength: parseInt(formData.cycleLength),
-        periodDuration: parseInt(formData.periodDuration),
-        lastPeriodDate: formData.lastPeriodDate,
-      });
-      localStorage.removeItem(DRAFT_KEY);
-      localStorage.removeItem(STEP_KEY);
-      // Hard navigate to bypass Next.js Router Cache
-      window.location.href = "/dashboard";
+      const userId = session?.user?.id;
+      if (!userId) {
+        setErrors({ lastPeriodDate: "Session expired. Please sign in again." });
+        return;
+      }
+      setSubmitting(true);
+      try {
+        const result = await completeOnboarding(userId, {
+          email: session?.user?.email || "",
+          age: parseInt(formData.age),
+          cycleLength: parseInt(formData.cycleLength),
+          periodDuration: parseInt(formData.periodDuration),
+          lastPeriodDate: formData.lastPeriodDate,
+        });
+        if (!result.success) {
+          setErrors({ lastPeriodDate: result.error || "Failed to save. Please try again." });
+          setSubmitting(false);
+          return;
+        }
+        localStorage.removeItem(DRAFT_KEY);
+        localStorage.removeItem(STEP_KEY);
+        // Hard navigate to bypass Next.js Router Cache
+        window.location.href = "/dashboard";
+      } catch {
+        setErrors({ lastPeriodDate: "Something went wrong. Please try again." });
+        setSubmitting(false);
+      }
     }
   }
 
@@ -233,9 +248,9 @@ export default function OnboardingPage() {
                 Back
               </Button>
             )}
-            <Button onClick={handleNext} className="flex-1">
-              {step === steps.length - 1 ? "Start Tracking" : "Continue"}
-              <ArrowRight className="w-4 h-4 ml-1" />
+            <Button onClick={handleNext} className="flex-1" disabled={submitting}>
+              {submitting ? "Saving..." : step === steps.length - 1 ? "Start Tracking" : "Continue"}
+              {!submitting && <ArrowRight className="w-4 h-4 ml-1" />}
             </Button>
           </div>
         </div>

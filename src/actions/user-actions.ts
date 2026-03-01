@@ -65,8 +65,8 @@ export async function completeOnboarding(
     periodDuration: number;
     lastPeriodDate: string;
   }
-): Promise<void> {
-  await getSupabase().from("user_profiles").upsert({
+): Promise<{ success: boolean; error?: string }> {
+  const { error } = await getSupabase().from("user_profiles").upsert({
     id: userId,
     email: data.email,
     age: data.age,
@@ -76,7 +76,14 @@ export async function completeOnboarding(
     onboarding_complete: true,
     updated_at: new Date().toISOString(),
   });
+
+  if (error) {
+    console.error("completeOnboarding failed:", error);
+    return { success: false, error: error.message };
+  }
+
   revalidatePath("/dashboard");
+  return { success: true };
 }
 
 export async function updateUserProfile(

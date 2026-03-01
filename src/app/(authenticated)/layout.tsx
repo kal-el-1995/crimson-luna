@@ -24,12 +24,15 @@ export default async function AuthenticatedLayout({
     profile = await getUserProfile(userId);
     if (!profile) {
       await createUserProfile(userId, session.user.email ?? "");
+      // Re-fetch after creation so we use the actual DB row
+      profile = await getUserProfile(userId);
     }
   } catch (e) {
     console.error("Supabase error fetching/creating profile:", e);
   }
 
   if (!profile) {
+    // Fallback only if Supabase is completely unreachable
     profile = {
       id: userId,
       email: session.user.email ?? "",
