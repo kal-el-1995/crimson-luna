@@ -36,8 +36,16 @@ export async function getUserProfile(
     .eq("id", userId)
     .single();
 
-  if (error || !data) return null;
-  return toUserProfile(data as DBUserProfile);
+  if (error) {
+    // PGRST116 = "JSON object requested, multiple (or no) rows returned"
+    // This means the user simply doesn't exist yet — return null
+    if (error.code === "PGRST116") return null;
+    // Any other error is a real DB issue — throw so the caller doesn't
+    // mistakenly try to create a duplicate profile
+    throw new Error(`getUserProfile failed: ${error.message}`);
+  }
+
+  return data ? toUserProfile(data as DBUserProfile) : null;
 }
 
 export async function createUserProfile(

@@ -20,26 +20,30 @@ export default async function AuthenticatedLayout({
   const userId = session.user.id;
 
   let profile: Omit<UserProfile, "name" | "image"> | null = null;
+  let dbError = false;
   try {
     profile = await getUserProfile(userId);
     if (!profile) {
+      // User truly doesn't exist yet — create a new profile
       await createUserProfile(userId, session.user.email ?? "");
-      // Re-fetch after creation so we use the actual DB row
       profile = await getUserProfile(userId);
     }
   } catch (e) {
-    console.error("Supabase error fetching/creating profile:", e);
+    // Real DB error (not "user not found") — don't try to create
+    console.error("Supabase error:", e);
+    dbError = true;
   }
 
   if (!profile) {
-    // Fallback only if Supabase is completely unreachable
     profile = {
       id: userId,
       email: session.user.email ?? "",
       cycleLength: 28,
       periodDuration: 5,
       lastPeriodDate: "",
-      onboardingComplete: false,
+      // If DB errored, assume returning user — don't force onboarding
+      // If genuinely new (no DB error), they need onboarding
+      onboardingComplete: dbError,
     };
   }
 
