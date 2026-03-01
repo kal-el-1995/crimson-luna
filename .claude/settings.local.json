@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:www.amazon.com)",
+      "Bash(tail:*)",
+      "Bash(pkill:*)",
+      "Bash(cd:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}
