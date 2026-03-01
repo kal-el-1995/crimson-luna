@@ -7,7 +7,7 @@ import { Play } from "lucide-react";
 export default function SignInButton() {
   return (
     <div className="flex flex-col sm:flex-row items-center gap-3">
-      <Button onClick={() => signIn("google")} variant="outline" size="lg">
+      <Button onClick={() => signIn("google", { callbackUrl: "/dashboard" })} variant="outline" size="lg">
         <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
           <path
             fill="currentColor"

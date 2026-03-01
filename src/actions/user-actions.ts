@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { getSupabase } from "@/lib/supabase";
 import { UserProfile } from "@/types";
 
@@ -74,6 +75,7 @@ export async function completeOnboarding(
     onboarding_complete: true,
     updated_at: new Date().toISOString(),
   });
+  revalidatePath("/dashboard");
 }
 
 export async function updateUserProfile(
