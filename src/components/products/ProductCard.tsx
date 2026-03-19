@@ -5,7 +5,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { useCartStore } from "@/stores/cart-store";
-import { Star, ShoppingCart, ExternalLink, Package } from "lucide-react";
+import { Star, ShoppingCart, Package } from "lucide-react";
 import { useState } from "react";
 
 interface ProductCardProps {
@@ -31,20 +31,14 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   return (
     <Card hover className="flex flex-col">
-      {/* Product image - links to Amazon */}
-      <a
-        href={product.amazonUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`View ${product.name} on Amazon`}
-        className="block aspect-square rounded-lg bg-white mb-4 overflow-hidden relative group"
-      >
+      {/* Product image */}
+      <div className="aspect-square rounded-lg bg-white mb-4 overflow-hidden">
         {!imgError ? (
           <img
-            src={`/api/image-proxy?url=${encodeURIComponent(product.amazonUrl)}`}
+            src={product.image}
             alt={product.name}
             loading="lazy"
-            className="w-full h-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
+            className="w-full h-full object-contain p-2"
             onError={() => setImgError(true)}
           />
         ) : (
@@ -52,12 +46,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             <Package aria-hidden="true" className="w-12 h-12 text-warm-white-muted/20" />
           </div>
         )}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
-          <span className="bg-dark/80 text-warm-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5">
-            View on Amazon <ExternalLink className="w-3 h-3" />
-          </span>
-        </div>
-      </a>
+      </div>
 
       {/* Tags */}
       <div className="flex flex-wrap gap-1.5 mb-2">
@@ -68,15 +57,10 @@ export default function ProductCard({ product }: ProductCardProps) {
         ))}
       </div>
 
-      {/* Name - links to Amazon */}
-      <a
-        href={product.amazonUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="font-medium text-warm-white text-sm mb-1 hover:text-crimson transition-colors"
-      >
+      {/* Name */}
+      <p className="font-medium text-warm-white text-sm mb-1">
         {product.name}
-      </a>
+      </p>
       <p className="text-xs text-warm-white-muted mb-3 line-clamp-2">{product.description}</p>
 
       {/* Rating */}

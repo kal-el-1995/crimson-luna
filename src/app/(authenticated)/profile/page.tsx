@@ -10,7 +10,7 @@ import { User, Calendar, Save, CheckCircle } from "lucide-react";
 
 export default function ProfilePage() {
   const { data: session } = useSession();
-  const { profile, updateProfile } = useUserStore();
+  const { profile, updateProfile, error: storeError, clearError } = useUserStore();
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
@@ -62,6 +62,7 @@ export default function ProfilePage() {
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
 
+    clearError();
     updateProfile({
       age: formData.age ? parseInt(formData.age) : undefined,
       cycleLength: parseInt(formData.cycleLength),
@@ -153,6 +154,13 @@ export default function ProfilePage() {
             error={errors.lastPeriodDate}
           />
         </div>
+
+        {storeError && (
+          <div className="mt-4 p-3 rounded-lg bg-crimson/10 border border-crimson/30 text-crimson text-sm flex items-center justify-between">
+            <span>{storeError}</span>
+            <button onClick={clearError} className="text-crimson/60 hover:text-crimson ml-4">&times;</button>
+          </div>
+        )}
 
         <div className="mt-6">
           <Button onClick={handleSave}>

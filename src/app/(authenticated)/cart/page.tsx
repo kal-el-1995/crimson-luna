@@ -4,12 +4,14 @@ import { useCartStore } from "@/stores/cart-store";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
-import { ShoppingCart, Trash2, Minus, Plus, ArrowRight } from "lucide-react";
+import { ShoppingCart, Trash2, Minus, Plus, ArrowRight, Package } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, toggleSubscription, subtotal, subscriptionSavings, total, clearCart } =
+  const { items, removeItem, updateQuantity, toggleSubscription, subtotal, subscriptionSavings, total, clearCart, error, clearError } =
     useCartStore();
+  const [checkoutClicked, setCheckoutClicked] = useState(false);
 
   if (items.length === 0) {
     return (
@@ -44,36 +46,37 @@ export default function CartPage() {
         </Button>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-crimson/10 border border-crimson/30 text-crimson text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={clearError} className="text-crimson/60 hover:text-crimson ml-4">&times;</button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Cart items */}
         <div className="lg:col-span-2 space-y-4">
           {items.map((item) => (
             <Card key={item.product.id} className="flex gap-4">
-              {/* Product image - links to Amazon */}
-              <a
-                href={item.product.amazonUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-24 h-24 rounded-lg bg-white flex items-center justify-center shrink-0 overflow-hidden hover:opacity-80 transition-opacity"
-              >
-                <img
-                  src={`/api/image-proxy?url=${encodeURIComponent(item.product.amazonUrl)}`}
-                  alt={item.product.name}
-                  className="w-full h-full object-contain p-1"
-                />
-              </a>
+              {/* Product image */}
+              <div className="w-24 h-24 rounded-lg bg-white flex items-center justify-center shrink-0 overflow-hidden">
+                {item.product.image ? (
+                  <img
+                    src={item.product.image}
+                    alt={item.product.name}
+                    className="w-full h-full object-contain p-1"
+                  />
+                ) : (
+                  <Package className="w-8 h-8 text-warm-white-muted/20" />
+                )}
+              </div>
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <a
-                      href={item.product.amazonUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-warm-white text-sm hover:text-crimson transition-colors"
-                    >
+                    <p className="font-medium text-warm-white text-sm">
                       {item.product.name}
-                    </a>
+                    </p>
                     <p className="text-xs text-warm-white-muted mt-0.5">{item.product.category}</p>
                   </div>
                   <button
@@ -165,22 +168,19 @@ export default function CartPage() {
             <Button
               className="w-full mt-6"
               size="lg"
-              aria-label="Checkout on Amazon"
               onClick={() => {
-                items.forEach((item) => {
-                  const url = item.product.amazonUrl;
-                  if (url) {
-                    window.open(url, "_blank");
-                  }
-                });
+                setCheckoutClicked(true);
+                setTimeout(() => setCheckoutClicked(false), 3000);
               }}
             >
               Checkout
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-            <p className="text-xs text-warm-white-muted text-center mt-2">
-              Complete your order on Amazon
-            </p>
+            {checkoutClicked && (
+              <p className="text-xs text-gold text-center mt-2 animate-pulse">
+                Checkout coming soon!
+              </p>
+            )}
 
             <Link href="/products">
               <Button variant="ghost" className="w-full mt-2" size="sm">

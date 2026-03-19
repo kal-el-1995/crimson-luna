@@ -2,6 +2,31 @@
 
 import { getSupabase } from "@/lib/supabase";
 import { Notification } from "@/types";
+import { auth } from "@/lib/auth";
+
+async function verifyUser(userId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id || session.user.id !== userId) {
+    throw new Error("Unauthorized");
+  }
+}
+
+async function verifyNotificationOwnership(notificationId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  // Notification IDs are formatted as `${userId}-${index}`
+  // Verify the notification belongs to the current user
+  const { data } = await getSupabase()
+    .from("notifications")
+    .select("user_id")
+    .eq("id", notificationId)
+    .single();
+
+  if (!data || data.user_id !== session.user.id) {
+    throw new Error("Unauthorized");
+  }
+}
 
 const seedNotifications: Omit<Notification, "id">[] = [
   {
@@ -87,6 +112,8 @@ const seedNotifications: Omit<Notification, "id">[] = [
 ];
 
 export async function getOrSeedNotifications(userId: string): Promise<Notification[]> {
+  await verifyUser(userId);
+
   const { data, error } = await getSupabase()
     .from("notifications")
     .select("*")
@@ -126,9 +153,13 @@ export async function getOrSeedNotifications(userId: string): Promise<Notificati
 }
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
+  await verifyNotificationOwnership(notificationId);
+
   await getSupabase().from("notifications").update({ read: true }).eq("id", notificationId);
 }
 
 export async function markAllNotificationsRead(userId: string): Promise<void> {
+  await verifyUser(userId);
+
   await getSupabase().from("notifications").update({ read: true }).eq("user_id", userId);
 }

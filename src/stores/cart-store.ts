@@ -13,11 +13,13 @@ import { useUserStore } from "@/stores/user-store";
 
 interface CartState {
   items: CartItem[];
+  error: string | null;
   addItem: (product: Product, isSubscription?: boolean) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   toggleSubscription: (productId: string) => void;
   clearCart: () => void;
+  clearError: () => void;
   totalItems: () => number;
   subtotal: () => number;
   subscriptionSavings: () => number;
@@ -31,10 +33,14 @@ function getUserId(): string | null {
 
 export const useCartStore = create<CartState>()((set, get) => ({
   items: [],
+  error: null,
 
   hydrateFromDB: (items) => set({ items }),
 
+  clearError: () => set({ error: null }),
+
   addItem: (product, isSubscription = false) => {
+    const prev = get().items;
     set((state) => {
       const existing = state.items.find((i) => i.product.id === product.id);
       if (existing) {
@@ -42,25 +48,38 @@ export const useCartStore = create<CartState>()((set, get) => ({
           items: state.items.map((i) =>
             i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
           ),
+          error: null,
         };
       }
       return {
         items: [...state.items, { product, quantity: 1, isSubscription }],
+        error: null,
       };
     });
     const userId = getUserId();
-    if (userId) addCartItem(userId, product, isSubscription).catch(console.error);
+    if (userId) {
+      addCartItem(userId, product.id, isSubscription).catch(() => {
+        set({ items: prev, error: "Failed to add item to cart" });
+      });
+    }
   },
 
   removeItem: (productId) => {
+    const prev = get().items;
     set((state) => ({
       items: state.items.filter((i) => i.product.id !== productId),
+      error: null,
     }));
     const userId = getUserId();
-    if (userId) removeCartItem(userId, productId).catch(console.error);
+    if (userId) {
+      removeCartItem(userId, productId).catch(() => {
+        set({ items: prev, error: "Failed to remove item" });
+      });
+    }
   },
 
   updateQuantity: (productId, quantity) => {
+    const prev = get().items;
     set((state) => ({
       items:
         quantity <= 0
@@ -68,32 +87,46 @@ export const useCartStore = create<CartState>()((set, get) => ({
           : state.items.map((i) =>
               i.product.id === productId ? { ...i, quantity } : i
             ),
+      error: null,
     }));
     const userId = getUserId();
-    if (userId) updateCartItem(userId, productId, quantity).catch(console.error);
+    if (userId) {
+      updateCartItem(userId, productId, quantity).catch(() => {
+        set({ items: prev, error: "Failed to update quantity" });
+      });
+    }
   },
 
   toggleSubscription: (productId) => {
+    const prev = get().items;
     set((state) => ({
       items: state.items.map((i) =>
         i.product.id === productId
           ? { ...i, isSubscription: !i.isSubscription }
           : i
       ),
+      error: null,
     }));
     const userId = getUserId();
     if (userId) {
       const item = get().items.find((i) => i.product.id === productId);
       if (item) {
-        toggleCartItemSubscription(userId, productId, item.isSubscription).catch(console.error);
+        toggleCartItemSubscription(userId, productId, item.isSubscription).catch(() => {
+          set({ items: prev, error: "Failed to update subscription" });
+        });
       }
     }
   },
 
   clearCart: () => {
-    set({ items: [] });
+    const prev = get().items;
+    set({ items: [], error: null });
     const userId = getUserId();
-    if (userId) clearCartItems(userId).catch(console.error);
+    if (userId) {
+      clearCartItems(userId).catch(() => {
+        set({ items: prev, error: "Failed to clear cart" });
+      });
+    }
   },
 
   totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),

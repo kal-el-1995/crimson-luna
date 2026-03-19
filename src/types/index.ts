@@ -37,7 +37,6 @@ export interface Product {
   price: number;
   originalPrice?: number;
   image: string;
-  amazonUrl: string;
   category: ProductCategory;
   rating: number;
   reviewCount: number;
@@ -45,6 +44,21 @@ export interface Product {
   isSubscriptionAvailable: boolean;
   subscriptionDiscount: number;
   tags: string[];
+}
+
+export interface ProductQuery {
+  category?: string;
+  search?: string;
+  sort?: string; // "price-asc" | "price-desc" | "rating" | "name" | "default"
+  page?: number; // 1-based
+  limit?: number; // default 12
+}
+
+export interface ProductResult {
+  products: Product[];
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 export type ProductCategory =
